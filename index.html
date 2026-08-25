@@ -501,7 +501,7 @@
         <li><span class="lbl">Instagram</span><a href="https://www.instagram.com/loscimientosdechicago/" target="_blank" rel="noopener">@loscimientosdechicago</a></li>
       </ul>
     </div>
-    <form onsubmit="handleSubmit(event)">
+    <form onsubmit="handleSubmit(event)" novalidate>
       <div class="row2">
         <div class="field">
           <label for="name" data-i18n="form.name">Nombre</label>
@@ -619,6 +619,7 @@ const translations = {
     "form.opt1":"Boda","form.opt2":"Quinceañera","form.opt3":"Restaurante / bar","form.opt4":"Cumpleaños","form.opt5":"Otro",
     "form.location":"Ciudad / lugar","form.details":"Detalles adicionales","form.submit":"Preparar mensaje",
     "form.note":"Al enviar, abriremos un mensaje de texto con los detalles listos para enviar.",
+    "validation.required":"Completa este campo.","validation.date":"Elige una fecha de hoy en adelante.",
     "footer.copy":"Los Cimientos de Chicago — Grupo Sierreño · Chicago, IL",
     "mobile.call":"Llamar","mobile.text":"Texto","mobile.book":"Reservar"
   },
@@ -658,6 +659,7 @@ const translations = {
     "form.opt1":"Wedding","form.opt2":"Quinceañera","form.opt3":"Restaurant / bar","form.opt4":"Birthday","form.opt5":"Other",
     "form.location":"City / venue","form.details":"Additional details","form.submit":"Prepare message",
     "form.note":"Submitting opens a text message with your details ready to send.",
+    "validation.required":"Please fill out this field.","validation.date":"Choose today or a future date.",
     "footer.copy":"Los Cimientos de Chicago — Sierreño Group · Chicago, IL",
     "mobile.call":"Call","mobile.text":"Text","mobile.book":"Book"
   }
@@ -723,6 +725,7 @@ function setLang(lang){
     ? "Los Cimientos de Chicago | Grupo Sierreño para Eventos"
     : "Los Cimientos de Chicago | Live Sierreño Band for Events";
   localStorage.setItem('lc_lang', lang);
+  document.querySelectorAll('form input, form select, form textarea').forEach(field=>field.setCustomValidity(''));
   renderCalendar();
 }
 
@@ -770,6 +773,18 @@ function handleSubmit(e){
   e.preventDefault();
   const lang = document.documentElement.lang;
   const form = e.currentTarget;
+  form.querySelectorAll('input, select, textarea').forEach(field=>{
+    field.setCustomValidity('');
+    if(field.required && !field.value.trim()){
+      field.setCustomValidity(translations[lang]['validation.required']);
+    }else if(field.validity.rangeUnderflow){
+      field.setCustomValidity(translations[lang]['validation.date']);
+    }
+  });
+  if(!form.checkValidity()){
+    form.reportValidity();
+    return;
+  }
   const values = new FormData(form);
   const labels = lang==='es'
     ? {intro:'Hola Los Cimientos, quisiera consultar disponibilidad para mi evento:',name:'Nombre',phone:'Teléfono',date:'Fecha',type:'Evento',location:'Lugar',details:'Detalles'}
@@ -785,6 +800,11 @@ function handleSubmit(e){
   ].join('\n');
   window.location.href = `sms:+17083697227?&body=${encodeURIComponent(message)}`;
 }
+
+document.querySelectorAll('form input, form select, form textarea').forEach(field=>{
+  field.addEventListener('input',()=>field.setCustomValidity(''));
+  field.addEventListener('change',()=>field.setCustomValidity(''));
+});
 </script>
 
 </body>
