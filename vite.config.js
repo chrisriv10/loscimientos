@@ -10,7 +10,7 @@ export default defineConfig(async () => {
         viteEnvironment: { name: "server" },
         config: {
           main: "src/worker.js",
-          compatibility_date: "2026-08-24",
+          compatibility_date: "2026-05-22",
           assets: { binding: "ASSETS" },
         },
       }),
