@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
+  <script src="https://cdn.jsdelivr.net/npm/ical.js@1.5.0/build/ical.min.js"></script>
+  <style>
   :root{
     --bg:#0B0D10;
     --bg-raise:#12161B;
@@ -665,8 +666,11 @@ const translations = {
   }
 };
 
-// Add confirmed bookings here in YYYY-MM-DD format. The public calendar updates automatically.
-const occupiedDates = new Set([]);
+// Calendar: fetch busy dates from Google Calendar public .ics feed
+// Replace PLACEHOLDER_CALENDAR_ID with your actual Google Calendar ID
+const ICAL_URL = 'https://calendar.google.com/calendar/ical/PLACEHOLDER_CALENDAR_ID/public/basic.ics';
+
+let occupiedDates = new Map(); // dateKey -> event title
 let calendarCursor = new Date();
 calendarCursor.setDate(1);
 
@@ -675,6 +679,47 @@ function localDateKey(date){
   const m = String(date.getMonth()+1).padStart(2,'0');
   const d = String(date.getDate()).padStart(2,'0');
   return `${y}-${m}-${d}`;
+}
+
+async function loadCalendarFromICS(){
+  try {
+    const res = await fetch(ICAL_URL);
+    if (!res.ok) throw new Error('Failed to fetch calendar');
+    const text = await res.text();
+    const jcal = ICAL.parse(text);
+    const comp = new ICAL.Component(jcal);
+    const events = comp.getAllSubcomponents('vevent');
+    const busy = new Map();
+    const now = new Date(); now.setHours(0,0,0,0);
+    const maxDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+
+    events.forEach(event => {
+      const vevent = new ICAL.Event(event);
+      const start = vevent.startDate.toJSDate();
+      const end = vevent.endDate.toJSDate();
+      const title = vevent.summary || (document.documentElement.lang === 'es' ? 'Ocupado' : 'Busy');
+
+      if (vevent.isRecurring()) {
+        const iterator = vevent.iterator();
+        let next;
+        while ((next = iterator.next()) && next.toJSDate() < maxDate) {
+          const d = next.toJSDate();
+          if (d >= now) busy.set(localDateKey(d), title);
+        }
+      } else {
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dd = new Date(d);
+          if (dd >= now && dd < maxDate) busy.set(localDateKey(dd), title);
+        }
+      }
+    });
+
+    occupiedDates = busy;
+    renderCalendar();
+  } catch (e) {
+    console.warn('Calendar sync failed:', e);
+    renderCalendar();
+  }
 }
 
 function renderCalendar(){
@@ -705,8 +750,10 @@ function renderCalendar(){
     if(key===localDateKey(today)) dayEl.classList.add('today');
     if(occupiedDates.has(key)){
       dayEl.classList.add('busy');
+      const eventTitle = occupiedDates.get(key);
       dayEl.dataset.busyLabel=lang==='es'?'Ocupado':'Busy';
-      dayEl.setAttribute('aria-label',`${cellDate.toLocaleDateString(locale)} — ${lang==='es'?'ocupado':'busy'}`);
+      dayEl.setAttribute('aria-label',`${cellDate.toLocaleDateString(locale)} — ${eventTitle}`);
+      dayEl.title = eventTitle;
     }
     grid.appendChild(dayEl);
   }
@@ -726,7 +773,7 @@ function setLang(lang){
     : "Los Cimientos de Chicago | Live Sierreño Band for Events";
   localStorage.setItem('lc_lang', lang);
   document.querySelectorAll('form input, form select, form textarea').forEach(field=>field.setCustomValidity(''));
-  renderCalendar();
+  loadCalendarFromICS();
 }
 
 // default: Spanish, unless the visitor previously chose English
